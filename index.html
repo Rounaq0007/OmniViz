@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> Omni Data Visualization Tool - Advanced 3D Charts</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2/dist/echarts-gl.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom base styles */
+        body {
+            font-family: 'Inter', sans-serif; /* Clean sans-serif font */
+        }
+
+        /* Consistent styling for chart containers */
+        .chart-container {
+            min-height: 400px; /* Minimum height for visibility */
+            height: 60vh;      /* Responsive height */
+            max-height: 500px; /* Maximum height */
+            width: 100%;       /* Full width of parent */
+            position: relative;/* Needed for chart libraries */
+            background-color: #ffffff; /* White background for charts */
+            border-radius: 0.5rem; /* Match parent rounding */
+            overflow: hidden; /* Ensure charts don't overflow */
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); /* Subtle inner shadow */
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+        }
+        .chart-container:hover {
+            transform: translateY(-5px); /* Slight lift on hover */
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06), 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* Add outer shadow on hover */
+        }
+
+        /* Ensure ECharts/Plotly canvases fill their container */
+        .chart-container > div,
+        .chart-container canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Style for the AI insights paragraph */
+        #aiInsights p {
+            margin-bottom: 0.5rem; /* Space between insight lines */
+            color: #e5e7eb; /* Lighter text */
+        }
+        #aiInsights strong {
+            color: #ffffff; /* White for strong tags */
+        }
+
+        /* Subtle text shadow for the main title */
+        .text-shadow {
+             text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Ensure modal is above other elements */
+        #errorModal {
+            z-index: 1000;
+        }
+
+        /* Placeholder text style */
+        .placeholder-text {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #9ca3af; /* Gray color for placeholder */
+            font-size: 0.875rem; /* Small text */
+            text-align: center;
+            padding: 1rem;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-800 to-slate-900 text-white p-4 md:p-8 min-h-screen">
+
+    <div class="text-center mb-8 md:mb-12">
+        <h1 class="text-3xl md:text-5xl font-bold mb-2 text-shadow">Omni Data Visualization</h1>
+        <p class="text-lg md:text-xl text-gray-300">Interactive 2D & 3D Charts from your CSV Data</p>
+    </div>
+
+    <div class="bg-white/10 backdrop-blur-md rounded-xl shadow-lg p-6 mb-8 max-w-4xl mx-auto border border-white/20">
+        <h3 class="text-xl font-semibold mb-4 text-center">Upload or Paste Data (CSV Format)</h3>
+        <div class="space-y-4">
+            <input type="file" id="fileInput" accept=".csv" onchange="handleFileUpload(event)"
+                   class="block w-full text-sm text-slate-300
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-lg file:border-0
+                          file:text-sm file:font-semibold
+                          file:bg-violet-100 file:text-violet-700
+                          hover:file:bg-violet-200 cursor-pointer border border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <textarea id="textInput" rows="6"
+                      placeholder="Label,Value&#10;A,10&#10;B,20&#10;C,30&#10;D,15&#10;E,25&#10;F,35&#10;G,5&#10;H,45"
+                      class="w-full p-3 rounded-lg bg-gray-700/60 text-white placeholder-gray-400 border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-y"></textarea>
+            <button onclick="generateVisuals()"
+                    class="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white font-bold rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500">
+                Generate Visuals
+            </button>
+        </div>
+    </div>
+
+    <div class="bg-white/10 backdrop-blur-md rounded-xl shadow-lg p-6 mb-8 max-w-4xl mx-auto border border-white/20">
+        <h3 class="text-xl font-semibold mb-4 text-center">Data Insights</h3>
+        <div id="aiInsights" class="text-center">
+            <p class="text-gray-400">Enter data and click "Generate Visuals" to see insights.</p>
+        </div>
+    </div>
+
+    <div class="bg-white/10 backdrop-blur-md rounded-xl shadow-lg p-6 max-w-screen-2xl mx-auto border border-white/20">
+        <h3 class="text-2xl font-semibold mb-8 text-center">Interactive Charts</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            <div class="chart-container" id="bar3d"><div class="placeholder-text">3D Bar Chart Area</div></div>
+            <div class="chart-container" id="pie3d"><div class="placeholder-text">Pie Chart Area</div></div>
+            <div class="chart-container" id="scatter3d"><div class="placeholder-text">3D Scatter Plot Area</div></div>
+            <div class="chart-container" id="surface3d"><div class="placeholder-text">3D Surface Plot Area</div></div>
+            <div class="chart-container" id="line3d"><div class="placeholder-text">3D Line Chart Area</div></div>
+            <div class="chart-container" id="area3d"><div class="placeholder-text">3D Area Chart Area</div></div>
+            <div class="chart-container" id="bubble3d"><div class="placeholder-text">3D Bubble Chart Area</div></div>
+            <div class="chart-container" id="histogram3d"><div class="placeholder-text">3D Histogram Area</div></div>
+        </div>
+    </div>
+
+    <div id="errorModal" class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg relative max-w-md w-full shadow-xl" role="alert">
+            <strong class="font-bold block mb-2">Error!</strong>
+            <span class="block sm:inline" id="errorMessage">Something went wrong.</span>
+            <span class="absolute top-0 bottom-0 right-0 px-4 py-3 cursor-pointer" onclick="closeErrorModal()">
+                <svg class="fill-current h-6 w-6 text-red-500 hover:text-red-700" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+            </span>
+        </div>
+    </div>
+
+    <script>
+        console.log("Script loaded. Waiting for DOM and libraries...");
+
+        // Global variables
+        let parsedData = []; // Store parsed data globally
+        let echartInstances = {}; // Store ECharts instances {id: instance}
+        let plotlyContainers = ['scatter3d', 'surface3d', 'bubble3d']; // IDs of Plotly containers
+        let echartContainers = ['bar3d', 'pie3d', 'line3d', 'area3d', 'histogram3d']; // IDs of ECharts containers
+
+        // --- Error Handling ---
+        function showError(message, error = null) {
+            console.error("Error:", message, error || ''); // Log detailed error
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorModal').classList.remove('hidden');
+        }
+
+        function closeErrorModal() {
+            document.getElementById('errorModal').classList.add('hidden');
+        }
+
+        // --- Data Handling ---
+        function handleFileUpload(event) {
+            console.log("handleFileUpload triggered");
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    console.log("File read successfully");
+                    document.getElementById('textInput').value = e.target.result;
+                    generateVisuals(); // Generate visuals after file load
+                };
+                reader.onerror = function(e) {
+                    showError("Error reading file.", e);
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        function parseCSV(text) {
+            console.log("Parsing CSV data...");
+            if (!text || text.trim() === '') {
+                showError("Please enter or upload CSV data.");
+                return null;
+            }
+            try {
+                const lines = text.trim().split('\n');
+                if (lines.length === 0) {
+                     showError("CSV data is empty.");
+                     return null;
+                }
+                const headerLine = lines[0].trim();
+                // Simple check for a plausible header (e.g., contains comma and not just numbers/commas)
+                // More robust check: Check if first column is non-numeric and second is numeric-like
+                let hasHeader = false;
+                const firstLineCols = headerLine.split(',');
+                if (firstLineCols.length >= 2 && isNaN(firstLineCols[0].trim()) && !isNaN(parseFloat(firstLineCols[1]))) {
+                   // Likely header if first col is text, second is number
+                   hasHeader = true;
+                } else if (headerLine.includes(',') && !/^[0-9.,\s]*$/.test(headerLine)) {
+                    // Fallback: contains comma and not purely numeric/commas
+                    hasHeader = true;
+                }
+
+
+                const dataStartIndex = hasHeader ? 1 : 0;
+                console.log(`Detected header: ${hasHeader}, starting data parse from line ${dataStartIndex + 1}`);
+
+                const data = lines.slice(dataStartIndex).map((line, index) => {
+                    const values = line.split(',');
+                    // Allow for more columns, but primarily use the first two
+                    if (values.length < 2) {
+                        console.warn(`Skipping malformed line ${index + dataStartIndex + 1}: ${line}`);
+                        return null;
+                    }
+                    const label = values[0].trim();
+                    const value = parseFloat(values[1]);
+
+                    if (label === "" || isNaN(value)) {
+                        console.warn(`Skipping invalid data line ${index + dataStartIndex + 1}: ${line} (Label: '${label}', Value: ${values[1]})`);
+                        return null;
+                    }
+                    // Store extra columns if they exist, might be useful later
+                    const extraValues = values.slice(2).map(v => parseFloat(v)).filter(v => !isNaN(v));
+                    return { label, value, extra: extraValues };
+                }).filter(item => item !== null);
+
+                if (data.length === 0) {
+                    showError("No valid data rows found. Ensure format is 'Label,Value[,Value2,...]' with numeric values after the first column.");
+                    return null;
+                }
+                console.log(`Parsed ${data.length} valid data rows.`);
+                return data;
+            } catch (error) {
+                showError("Error parsing CSV data. Please check the format.", error);
+                return null;
+            }
+        }
+
+        // --- Chart Generation ---
+        function generateVisuals() {
+            console.log("generateVisuals called");
+            // Check if libraries are loaded
+            if (typeof echarts === 'undefined' || typeof Plotly === 'undefined') {
+                showError("Charting libraries (ECharts/Plotly) not loaded yet. Please wait or check console for loading errors.");
+                console.error("ECharts or Plotly is undefined.");
+                return;
+            }
+            console.log("Charting libraries seem loaded.");
+
+            const text = document.getElementById('textInput').value;
+            const data = parseCSV(text);
+
+            if (!data) {
+                console.log("Parsing failed or returned no data. Clearing charts.");
+                clearChartsAndInsights();
+                return;
+            }
+
+            parsedData = data; // Store valid data
+            console.log("Data parsed successfully, proceeding to generate charts:", parsedData);
+
+            const labels = data.map(d => d.label);
+            const values = data.map(d => d.value);
+
+            try {
+                // Clear existing charts before generating new ones
+                clearChartsAndInsights(false); // Clear without removing resize listener yet
+
+                // Generate each chart type
+                generate3DBar(labels, values);
+                generatePseudo3DPie(labels, values);
+                generate3DScatter(data); // Pass full data for potential extra values
+                generate3DSurface(labels, values);
+                generate3DLine(labels, values);
+                generate3DArea(labels, values); // Using ECharts Surface
+                generate3DBubble(data); // Pass full data
+                generate3DHistogram(values);
+
+                // Generate insights
+                generateAIInsights(data);
+
+                // Add resize listener if not already added
+                window.removeEventListener('resize', resizeCharts); // Remove previous listener first
+                window.addEventListener('resize', resizeCharts);
+                console.log("All charts generated and resize listener added.");
+
+            } catch (error) {
+                 showError("An unexpected error occurred during chart generation.", error);
+            }
+        }
+
+        function clearChartsAndInsights(removeListener = true) {
+            console.log("Clearing charts and insights...");
+            document.getElementById('aiInsights').innerHTML = '<p class="text-gray-400">Enter data and click "Generate Visuals" to see insights.</p>';
+
+            // Dispose ECharts instances
+            Object.keys(echartInstances).forEach(id => {
+                if (echartInstances[id] && typeof echartInstances[id].dispose === 'function') {
+                    try {
+                        echartInstances[id].dispose();
+                         console.log(`Disposed ECharts instance: ${id}`);
+                    } catch (e) { console.warn(`Error disposing chart ${id}:`, e); }
+                }
+                const container = document.getElementById(id);
+                if (container) container.innerHTML = `<div class="placeholder-text">${id.replace('3d',' 3D ')} Area</div>`; // Clear container HTML and add placeholder
+                echartInstances[id] = null; // Clear reference
+            });
+             echartInstances = {}; // Reset the object
+
+            // Purge Plotly plots
+            plotlyContainers.forEach(id => {
+                const container = document.getElementById(id);
+                if (container) {
+                    try {
+                        Plotly.purge(container);
+                        console.log(`Purged Plotly plot: ${id}`);
+                    } catch (e) { /* Ignore if purge fails (e.g., no plot existed) */ }
+                    container.innerHTML = `<div class="placeholder-text">${id.replace('3d',' 3D ')} Area</div>`; // Clear container HTML and add placeholder
+                }
+            });
+
+            parsedData = []; // Clear stored data
+            if (removeListener) {
+                window.removeEventListener('resize', resizeCharts); // Remove listener
+                console.log("Resize listener removed.");
+            }
+            console.log("Charts cleared.");
+        }
+
+        // Helper to clear and prepare a chart container, storing ECharts instance
+        function initEchart(elementId) {
+             console.log(`Initializing ECharts for ${elementId}...`);
+            const container = document.getElementById(elementId);
+            if (!container) {
+                console.error(`Container element with ID '${elementId}' not found.`);
+                showError(`Chart container '${elementId}' missing in HTML.`);
+                return null;
+            }
+
+            // Dispose existing instance if present
+            if (echartInstances[elementId] && typeof echartInstances[elementId].dispose === 'function') {
+                 try {
+                     echartInstances[elementId].dispose();
+                     console.log(`Disposed previous ECharts instance for ${elementId}`);
+                 } catch (e) { console.warn(`Error disposing chart ${elementId}:`, e); }
+            }
+            // IMPORTANT: Clear previous content *before* init to avoid ECharts conflicts
+            container.innerHTML = '';
+
+            try {
+                // Initialize ECharts
+                const chart = echarts.init(container, null, { renderer: 'canvas' }); // Use canvas renderer, often better performance for GL
+                echartInstances[elementId] = chart; // Store the instance
+                console.log(`ECharts instance created successfully for ${elementId}`);
+                return chart;
+            } catch (error) {
+                showError(`Failed to initialize ECharts on element '${elementId}'. Make sure ECharts and ECharts-GL are loaded.`, error);
+                container.innerHTML = `<div class="placeholder-text">Error initializing ${elementId.replace('3d',' 3D ')}</div>`; // Show error in container
+                return null;
+            }
+        }
+
+        // Helper function for Plotly initialization
+        function initPlotly(elementId, data, layout, config = {responsive: true}) {
+            console.log(`Initializing Plotly for ${elementId}...`);
+            const container = document.getElementById(elementId);
+            if (!container) {
+                showError(`Chart container '${elementId}' missing in HTML.`);
+                return false;
+            }
+            try {
+                Plotly.purge(container); // Clear previous plot
+            } catch (e) { /* Ignore purge errors */ }
+            container.innerHTML = ''; // Clear placeholder
+
+            try {
+                Plotly.newPlot(elementId, data, layout, config);
+                console.log(`Plotly plot generated for ${elementId}`);
+                return true;
+            } catch (error) {
+                showError(`Failed to generate Plotly plot '${elementId}'.`, error);
+                container.innerHTML = `<div class="placeholder-text">Error generating ${elementId.replace('3d',' 3D ')}</div>`; // Show error in container
+                return false;
+            }
+        }
+
+        // --- Specific Chart Functions ---
+
+        // Function to generate 3D Bar Chart using ECharts GL
+        function generate3DBar(labels, values) {
+             console.log("Generating 3D Bar Chart...");
+             const chart = initEchart('bar3d');
+             if (!chart) return;
+
+             try {
+                 // Map data: [xIndex, yIndex (constant 0), zValue]
+                 const data = labels.map((label, i) => [i, 0, values[i]]);
+                 const maxVal = values.length > 0 ? Math.max(...values) : 1;
+                 const minVal = values.length > 0 ? Math.min(...values) : 0;
+
+                 const option = {
+                     title: { text: '3D Bar Chart', left: 'center', textStyle: { color: '#333', fontWeight: 'bold' } },
+                     tooltip: {
+                         trigger: 'item',
+                         formatter: (params) => {
+                             // params.value gives [xIndex, yIndex, zValue]
+                             // params.name gives the category label from xAxis3D
+                             return `${params.name}<br/>Value: ${params.value[2].toLocaleString()}`;
+                         }
+                     },
+                     visualMap: {
+                         max: maxVal, min: minVal,
+                         inRange: { color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#ffffbf', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026'].reverse() },
+                         textStyle: { color: '#333' }, itemWidth: 15, itemHeight: 100, left: 10, bottom: 20, orient: 'vertical', show: values.length > 0
+                     },
+                     xAxis3D: { type: 'category', data: labels, name: 'Label', nameTextStyle: { color: '#333' }, axisLabel: { color: '#555', interval: 0, rotate: 30, margin: 8 } }, // Rotate labels if needed
+                     yAxis3D: { type: 'value', show: false }, // Keep Y hidden for simple bar
+                     zAxis3D: { type: 'value', name: 'Value', nameTextStyle: { color: '#333' }, axisLabel: { color: '#555' } },
+                     grid3D: {
+                         boxWidth: 150, boxDepth: 80, viewControl: { autoRotate: true, distance: 250 },
+                         light: { main: { intensity: 1.2, shadow: true, alpha: 55, beta: 35 }, ambient: { intensity: 0.3 } },
+                         axisPointer: { show: true, lineStyle: { color: 'rgba(0,0,0,0.6)' } }
+                     },
+                     series: [{
+                         type: 'bar3D', data: data, shading: 'lambert', label: { show: false }, // Labels can clutter 3D bars
+                         itemStyle: { opacity: 0.9 },
+                         emphasis: { itemStyle: { color: '#FFDB58' }, label: { show: false } } // Highlight color
+                     }]
+                 };
+                 chart.setOption(option);
+                 console.log("3D Bar Chart options set.");
+             } catch (error) {
+                 showError("Failed to generate 3D Bar Chart.", error);
+             }
+        }
+
+        // Function to generate a 2D Pie Chart styled to look 3D
+        function generatePseudo3DPie(labels, values) {
+            console.log("Generating Pseudo 3D Pie Chart...");
+            const chart = initEchart('pie3d');
+            if (!chart) return;
+
+             try {
+                 const data = labels.map((label, i) => ({ name: label, value: values[i] }));
+                 const maxVal = values.length > 0 ? Math.max(...values) : 1;
+                 const minVal = values.length > 0 ? Math.min(...values) : 0;
+
+                 const option = {
+                     title: { text: 'Pie Chart (Styled)', left: 'center', textStyle: { color: '#333', fontWeight: 'bold' } },
+                     tooltip: { trigger: 'item', formatter: '{a} <br/>{b}: {c} ({d}%)' },
+                     // Use a predefined color palette for better distinction
+                     color: ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'],
+                     legend: {
+                         orient: 'vertical', left: 'left', top: 'middle',
+                         textStyle: { color: '#333' },
+                         show: data.length <= 10 // Show legend only for fewer items
+                     },
+                     series: [{
+                         name: 'Data', type: 'pie', radius: ['40%', '70%'], center: ['50%', '55%'], avoidLabelOverlap: true,
+                         itemStyle: {
+                             borderRadius: 8, borderColor: '#fff', borderWidth: 2,
+                             // Subtle shadow for depth
+                             shadowBlur: 15, shadowColor: 'rgba(0, 0, 0, 0.3)', shadowOffsetX: 3, shadowOffsetY: 3
+                         },
+                         label: { show: true, position: 'outside', formatter: '{b}: {d}%', color: '#333', minMargin: 5, edgeDistance: 10, lineHeight: 15 },
+                         emphasis: {
+                             label: { show: true, fontSize: 14, fontWeight: 'bold' },
+                             itemStyle: { shadowBlur: 20, shadowOffsetX: 5, shadowOffsetY: 5, borderColor: '#aaa', borderWidth: 2 } // Enhanced emphasis
+                         },
+                         labelLine: { show: true, length: 15, length2: 10, lineStyle: { color: '#555' } },
+                         data: data
+                     }]
+                 };
+                 chart.setOption(option);
+                 console.log("Pseudo 3D Pie Chart options set.");
+             } catch (error) {
+                  showError("Failed to generate Pie Chart.", error);
+             }
+        }
+
+
+        // Function to generate 3D Scatter Plot using Plotly
+        function generate3DScatter(data) {
+            console.log("Generating 3D Scatter Plot...");
+            const containerId = 'scatter3d';
+
+            if (!data || data.length < 1) {
+                document.getElementById(containerId).innerHTML = '<p class="placeholder-text">Not enough data for 3D Scatter Plot.</p>';
+                console.log("Not enough data for 3D Scatter.");
+                return;
+            }
+
+            try {
+                // Map data: x = index, y = value, z = derived value (e.g., value * sin(index) or use extra column if available)
+                const xData = data.map((_, i) => i);
+                const yData = data.map(d => d.value);
+                // Use third data column if available and numeric, otherwise derive Z
+                const zData = data.map((d, i) => (d.extra && d.extra.length > 0) ? d.extra[0] : d.value * Math.sin(i * 0.5)); // Example derivation
+                const labels = data.map(d => d.label);
+                const values = data.map(d => d.value); // Used for color scale
+
+                const trace = {
+                    x: xData, y: yData, z: zData,
+                    text: labels.map((l, i) => `${l}<br>X: ${xData[i]}<br>Y: ${yData[i].toLocaleString()}<br>Z: ${zData[i].toLocaleString(undefined, {maximumFractionDigits: 2})}`),
+                    hoverinfo: 'text', mode: 'markers', type: 'scatter3d',
+                    marker: {
+                        size: 8, color: values, // Color points by the primary value
+                        colorscale: 'Viridis', opacity: 0.8,
+                        colorbar: { title: 'Value (Y)', tickfont: { color: '#333' }, titlefont: { color: '#333' } }
+                    }
+                };
+                const layout = {
+                    title: { text: '3D Scatter Plot', font: { color: '#333', weight: 'bold' } },
+                    scene: {
+                        xaxis: { title: 'Index (X)', titlefont: { color: '#333' }, tickfont: { color: '#555' }, backgroundcolor: "rgb(240, 240, 240)", gridcolor: "rgb(255, 255, 255)", showbackground: true, zerolinecolor: "rgb(200, 200, 200)"},
+                        yaxis: { title: 'Value (Y)', titlefont: { color: '#333' }, tickfont: { color: '#555' }, backgroundcolor: "rgb(240, 240, 240)", gridcolor: "rgb(255, 255, 255)", showbackground: true, zerolinecolor: "rgb(200, 200, 200)" },
+                        zaxis: { title: 'Derived/Input (Z)', titlefont: { color: '#333' }, tickfont: { color: '#555' }, backgroundcolor: "rgb(240, 240, 240)", gridcolor: "rgb(255, 255, 255)", showbackground: true, zerolinecolor: "rgb(200, 200, 200)" }
+                    },
+                    paper_bgcolor: 'rgba(255,255,255,1)', plot_bgcolor: 'rgba(255,255,255,1)',
+                    margin: { l: 10, r: 10, b: 10, t: 50 },
+                    hoverlabel: { bgcolor: "#FFF", font: { color: '#333' }, bordercolor: '#ccc' }
+                };
+
+                initPlotly(containerId, [trace], layout);
+                 console.log("3D Scatter Plot generated.");
+            } catch (error) {
+                 showError("Failed to generate 3D Scatter Plot.", error);
+            }
+        }
+
+        // Function to generate 3D Surface Chart using Plotly
+        function generate3DSurface(labels, values) {
+             console.log("Generating 3D Surface Plot...");
+            const containerId = 'surface3d';
+
+            const n = Math.ceil(Math.sqrt(values.length));
+            if (n < 2 || values.length < 4) {
+                document.getElementById(containerId).innerHTML = '<p class="placeholder-text">Not enough data for 3D Surface Plot (needs at least 4 points for a 2x2 grid).</p>';
+                 console.log("Not enough data for 3D Surface.");
+                return;
+            }
+
+            try {
+                // Create a grid for the surface plot
+                let z_data = []; let x_data = []; let y_data = []; let k = 0;
+                // Determine a padding value (e.g., median) if data doesn't fill grid perfectly
+                const sortedValues = [...values].sort((a, b) => a - b);
+                const mid = Math.floor(sortedValues.length / 2);
+                const medianValue = sortedValues.length % 2 !== 0 ? sortedValues[mid] : (sortedValues[mid - 1] + sortedValues[mid]) / 2;
+                const paddingValue = values.length > 0 ? medianValue : 0;
+
+                for (let i = 0; i < n; i++) {
+                    let row = []; y_data.push(i); // Y coordinates
+                    if (i === 0) { for(let j = 0; j < n; j++) x_data.push(j); } // X coordinates (only need once)
+                    for (let j = 0; j < n; j++) {
+                        // Fill the grid, using padding value if we run out of input data
+                        row.push(k < values.length ? values[k] : paddingValue); k++;
+                    }
+                    z_data.push(row);
+                }
+
+                const data = [{
+                    x: x_data, y: y_data, z: z_data, type: 'surface', colorscale: 'Earth',
+                    contours: { z: { show: true, usecolormap: true, highlightcolor: "#42f462", project: { z: true } } },
+                    colorbar: { title: 'Value', tickfont: { color: '#333' }, titlefont: { color: '#333' } }
+                }];
+                const layout = {
+                    title: { text: '3D Surface Plot (Grid Approximation)', font: { color: '#333', weight: 'bold' } },
+                    scene: {
+                        xaxis: { title: 'X Index', titlefont: { color: '#333' }, tickfont: { color: '#555' } },
+                        yaxis: { title: 'Y Index', titlefont: { color: '#333' }, tickfont: { color: '#555' } },
+                        zaxis: { title: 'Value (Z)', titlefont: { color: '#333' }, tickfont: { color: '#555' } }
+                    },
+                    autosize: true, paper_bgcolor: 'rgba(255,255,255,1)', plot_bgcolor: 'rgba(255,255,255,1)',
+                    margin: { l: 10, r: 10, b: 10, t: 50 }
+                };
+
+                initPlotly(containerId, data, layout);
+                console.log("3D Surface Plot generated.");
+            } catch (error) {
+                 showError("Failed to generate 3D Surface Plot.", error);
+            }
+        }
+
+        // --- NEW CHART FUNCTIONS ---
+
+        // Function to generate 3D Line Chart using ECharts GL
+        function generate3DLine(labels, values) {
+            console.log("Generating 3D Line Chart...");
+            const chart = initEchart('line3d');
+            if (!chart) return;
+
+            if (values.length < 2) {
+                chart.getDom().innerHTML = '<p class="placeholder-text">Need at least 2 data points for a line chart.</p>';
+                console.log("Not enough data for 3D Line.");
+                return;
+            }
+
+            try {
+                // Map data: [xIndex, yIndex (or derived), zValue]
+                // Let's map Y to index as well for a simple spiral effect
+                const data = values.map((value, i) => [i, i * 0.5, value]); // Example: X=index, Y=index*0.5, Z=value
+                const maxVal = values.length > 0 ? Math.max(...values) : 1;
+                const minVal = values.length > 0 ? Math.min(...values) : 0;
+
+                const option = {
+                    title: { text: '3D Line Chart', left: 'center', textStyle: { color: '#333', fontWeight: 'bold' } },
+                    tooltip: {
+                        trigger: 'axis', // Show tooltip based on axis proximity
+                        formatter: (params) => {
+                            const point = params[0]; // Assuming one series
+                            const index = point.dataIndex;
+                            const dataPoint = data[index]; // [x, y, z]
+                            return `Label: ${labels[index]}<br/>X: ${dataPoint[0]}<br/>Y: ${dataPoint[1].toFixed(2)}<br/>Value (Z): ${dataPoint[2].toLocaleString()}`;
+                        }
+                    },
+                    visualMap: {
+                        max: maxVal, min: minVal, dimension: 2, // Map color to the 3rd dimension (Z value)
+                        inRange: { color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#ffffbf', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026'].reverse() },
+                        textStyle: { color: '#333' }, itemWidth: 15, itemHeight: 100, left: 10, bottom: 20, orient: 'vertical', show: values.length > 0
+                    },
+                    xAxis3D: { type: 'value', name: 'X', nameTextStyle: { color: '#333' }, axisLabel: { color: '#555' } },
+                    yAxis3D: { type: 'value', name: 'Y', nameTextStyle: { color: '#333' }, axisLabel: { color: '#555' } },
+                    zAxis3D: { type: 'value', name: 'Value (Z)', nameTextStyle: { color: '#333' }, axisLabel: { color: '#555' } },
+                    grid3D: {
+                        boxWidth: 150, boxDepth: 100, viewControl: { autoRotate: true, distance: 250 },
+                        light: { main: { intensity: 1.2, shadow: true, alpha: 55, beta: 35 }, ambient: { intensity: 0.3 } },
+                        axisPointer: { show: true, lineStyle: { color: 'rgba(0,0,0,0.6)' } }
+                    },
+                    series: [{
+                        type: 'line3D', data: data,
+                        lineStyle: { width: 4 },
+                        emphasis: { lineStyle: { width: 6 } }
+                    }]
+                };
+                chart.setOption(option);
+                console.log("3D Line Chart options set.");
+            } catch (error) {
+                showError("Failed to generate 3D Line Chart.", error);
+            }
+        }
+
+        // Function to generate 3D Area Chart (using ECharts Surface)
+        function generate3DArea(labels, values) {
+            console.log("Generating 3D Area Chart (Surface)...");
+            const chart = initEchart('area3d');
+            if (!chart) return;
+
+            const n = Math.ceil(Math.sqrt(values.length));
+            if (n < 2 || values.length < 4) {
+                chart.getDom().innerHTML = '<p class="placeholder-text">Not enough data for 3D Area/Surface Plot (needs at least 4 points).</p>';
+                console.log("Not enough data for 3D Area/Surface.");
+                return;
+            }
+
+            try {
+                // Create data grid [x, y, z] for ECharts surface
+                let data = [];
+                let k = 0;
+                const sortedValues = [...values].sort((a, b) => a - b);
+                const mid = Math.floor(sortedValues.length / 2);
+                const medianValue = sortedValues.length % 2 !== 0 ? sortedValues[mid] : (sortedValues[mid - 1] + sortedValues[mid]) / 2;
+                const paddingValue = values.length > 0 ? medianValue : 0;
+
+                for (let i = 0; i < n; i++) { // Y dimension
+                    for (let j = 0; j < n; j++) { // X dimension
+                        const value = k < values.length ? values[k] : paddingValue;
+                        data.push([j, i, value]);
+                        k++;
+                    }
+                }
+
+                const maxVal = values.length > 0 ? Math.max(...values) : 1;
+                const minVal = values.length > 0 ? Math.min(...values) : 0;
+
+                const option = {
+                    title: { text: '3D Area Chart (Surface)', left: 'center', textStyle: { color: '#333', fontWeight: 'bold' } },
+                    tooltip: {
+                        trigger: 'item', // Tooltip on data points
+                        formatter: (params) => {
+                            // params.value gives [x, y, z]
+                            return `X: ${params.value[0]}<br/>Y: ${params.value[1]}<br/>Value (Z): ${params.value[2].toLocaleString()}`;
+                        }
+                    },
+                    visualMap: {
+                        max: maxVal, min: minVal, dimension: 2, // Color based on Z value
+                        inRange: { color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#ffffbf', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026'] }, // Different color scale
+                        textStyle: { color: '#333' }, itemWidth: 15, itemHeight: 100, left: 10, bottom: 20, orient: 'vertical', show: values.length > 0
+                    },
+                    xAxis3D: { type: 'value', name: 'X Index', nameTextStyle: { color: '#333' }, axisLabel: { color: '#555' } },
+                    yAxis3D: { type: 'value', name: 'Y Index', nameTextStyle: { color: '#333' }, axisLabel: { color: '#555' } },
+                    zAxis3D: { type: 'value', name: 'Value (Z)', nameTextStyle: { color: '#333' }, axisLabel: { color: '#555' } },
+                    grid3D: {
+                        boxWidth: 150, boxDepth: 100, viewControl: { autoRotate: true, distance: 250 },
+                        light: { main: { intensity: 1.2, shadow: true, alpha: 55, beta: 35 }, ambient: { intensity: 0.3 } },
+                        axisPointer: { show: true, lineStyle: { color: 'rgba(0,0,0,0.6)' } }
+                    },
+                    series: [{
+                        type: 'surface', data: data, shading: 'lambert', // Use lambert shading for solid look
+                        itemStyle: { opacity: 0.9 },
+                        wireframe: { show: true, lineStyle: { color: 'rgba(0, 0, 0, 0.3)', width: 0.5 } } // Add subtle wireframe
+                    }]
+                };
+                chart.setOption(option);
+                console.log("3D Area Chart (Surface) options set.");
+            } catch (error) {
+                showError("Failed to generate 3D Area Chart (Surface).", error);
+            }
+        }
+
+        // Function to generate 3D Bubble Chart using Plotly
+        function generate3DBubble(data) {
+            console.log("Generating 3D Bubble Chart...");
+            const containerId = 'bubble3d';
+
+            if (!data || data.length < 1) {
+                document.getElementById(containerId).innerHTML = '<p class="placeholder-text">Not enough data for 3D Bubble Chart.</p>';
+                console.log("Not enough data for 3D Bubble.");
+                return;
+            }
+
+            try {
+                // Map data: x = index, y = value, z = derived/extra, size = value, color = value
+                const xData = data.map((_, i) => i);
+                const yData = data.map(d => d.value);
+                // Use third data column if available and numeric, otherwise derive Z
+                const zData = data.map((d, i) => (d.extra && d.extra.length > 0) ? d.extra[0] : d.value * Math.cos(i * 0.5)); // Example derivation using cosine
+                const sizeData = data.map(d => d.value); // Size based on primary value
+                const colorData = data.map(d => d.value); // Color based on primary value
+                const labels = data.map(d => d.label);
+
+                // Normalize size for better visualization (prevent huge bubbles)
+                const maxSize = 40; // Max bubble pixel size
+                const maxDataValue = Math.max(...sizeData.filter(v => v > 0)); // Avoid log(0)
+                const normalizedSize = sizeData.map(s => s > 0 ? Math.max(5, (Math.log(s + 1) / Math.log(maxDataValue + 1)) * maxSize) : 5); // Log scale, min size 5
+
+                const trace = {
+                    x: xData, y: yData, z: zData,
+                    text: labels.map((l, i) => `${l}<br>X: ${xData[i]}<br>Y: ${yData[i].toLocaleString()}<br>Z: ${zData[i].toLocaleString(undefined, {maximumFractionDigits: 2})}<br>Size Value: ${sizeData[i].toLocaleString()}`),
+                    hoverinfo: 'text', mode: 'markers', type: 'scatter3d',
+                    marker: {
+                        size: normalizedSize, // Use normalized size
+                        sizemode: 'diameter', // 'diameter' or 'area'
+                        color: colorData,
+                        colorscale: 'Plasma', // Different colorscale
+                        opacity: 0.7,
+                        colorbar: { title: 'Value (Color/Size)', tickfont: { color: '#333' }, titlefont: { color: '#333' } }
+                    }
+                };
+                const layout = {
+                    title: { text: '3D Bubble Chart', font: { color: '#333', weight: 'bold' } },
+                    scene: {
+                        xaxis: { title: 'Index (X)', titlefont: { color: '#333' }, tickfont: { color: '#555' }, backgroundcolor: "rgb(240, 240, 240)", gridcolor: "rgb(255, 255, 255)", showbackground: true, zerolinecolor: "rgb(200, 200, 200)"},
+                        yaxis: { title: 'Value (Y)', titlefont: { color: '#333' }, tickfont: { color: '#555' }, backgroundcolor: "rgb(240, 240, 240)", gridcolor: "rgb(255, 255, 255)", showbackground: true, zerolinecolor: "rgb(200, 200, 200)" },
+                        zaxis: { title: 'Derived/Input (Z)', titlefont: { color: '#333' }, tickfont: { color: '#555' }, backgroundcolor: "rgb(240, 240, 240)", gridcolor: "rgb(255, 255, 255)", showbackground: true, zerolinecolor: "rgb(200, 200, 200)" }
+                    },
+                    paper_bgcolor: 'rgba(255,255,255,1)', plot_bgcolor: 'rgba(255,255,255,1)',
+                    margin: { l: 10, r: 10, b: 10, t: 50 },
+                    hoverlabel: { bgcolor: "#FFF", font: { color: '#333' }, bordercolor: '#ccc' }
+                };
+
+                initPlotly(containerId, [trace], layout);
+                console.log("3D Bubble Chart generated.");
+            } catch (error) {
+                showError("Failed to generate 3D Bubble Chart.", error);
+            }
+        }
+
+        // Function to generate 3D Histogram (using ECharts 3D Bar)
+        function generate3DHistogram(values) {
+            console.log("Generating 3D Histogram (Bar Representation)...");
+            const chart = initEchart('histogram3d');
+            if (!chart) return;
+
+            if (values.length < 1) {
+                chart.getDom().innerHTML = '<p class="placeholder-text">Not enough data for Histogram.</p>';
+                console.log("Not enough data for Histogram.");
+                return;
+            }
+
+            try {
+                // 1. Determine Bins
+                const numBins = Math.max(5, Math.min(15, Math.ceil(Math.sqrt(values.length)))); // Sensible number of bins
+                const minVal = Math.min(...values);
+                const maxVal = Math.max(...values);
+                const binWidth = (maxVal - minVal) / numBins || 1; // Avoid division by zero if all values are same
+
+                let bins = Array(numBins).fill(0);
+                let binLabels = Array(numBins);
+
+                for (let i = 0; i < numBins; i++) {
+                    const binStart = minVal + i * binWidth;
+                    const binEnd = binStart + binWidth;
+                    binLabels[i] = `${binStart.toLocaleString(undefined, {maximumFractionDigits:1})} - ${binEnd.toLocaleString(undefined, {maximumFractionDigits:1})}`;
+                }
+
+                // 2. Populate Bins
+                values.forEach(value => {
+                    let binIndex = Math.floor((value - minVal) / binWidth);
+                    // Handle edge case where value equals maxVal
+                    if (value === maxVal) {
+                        binIndex = numBins - 1;
+                    }
+                     // Ensure index is within bounds (can happen with floating point inaccuracies)
+                    binIndex = Math.max(0, Math.min(numBins - 1, binIndex));
+                    bins[binIndex]++;
+                });
+
+                // 3. Prepare data for bar3D: [xCategoryIndex, yIndex (0), zFrequency]
+                const data = bins.map((count, i) => [i, 0, count]);
+                const maxFreq = bins.length > 0 ? Math.max(...bins) : 1;
+
+                // 4. Create Chart
+                const option = {
+                    title: { text: '3D Histogram (Value Distribution)', left: 'center', textStyle: { color: '#333', fontWeight: 'bold' } },
+                    tooltip: {
+                        trigger: 'item',
+                        formatter: (params) => {
+                            // params.value gives [xIndex, yIndex, zValue]
+                            // params.name gives the category label from xAxis3D
+                            return `Bin: ${params.name}<br/>Frequency: ${params.value[2].toLocaleString()}`;
+                        }
+                    },
+                    visualMap: {
+                        max: maxFreq, min: 0, // Frequency range
+                        inRange: { color: ['#ffffcc', '#ffeda0', '#fed976', '#feb24c', '#fd8d3c', '#fc4e2a', '#e31a1c', '#bd0026', '#800026'].reverse() }, // Sequential scale
+                        textStyle: { color: '#333' }, itemWidth: 15, itemHeight: 100, left: 10, bottom: 20, orient: 'vertical', show: true
+                    },
+                    xAxis3D: { type: 'category', data: binLabels, name: 'Value Bins', nameTextStyle: { color: '#333' }, axisLabel: { color: '#555', interval: 0, rotate: 20, margin: 8 } },
+                    yAxis3D: { type: 'value', show: false },
+                    zAxis3D: { type: 'value', name: 'Frequency', nameTextStyle: { color: '#333' }, axisLabel: { color: '#555' } },
+                    grid3D: {
+                        boxWidth: 180, boxDepth: 80, viewControl: { autoRotate: true, distance: 280 }, // Adjust view
+                        light: { main: { intensity: 1.2, shadow: true, alpha: 55, beta: 35 }, ambient: { intensity: 0.3 } },
+                        axisPointer: { show: true, lineStyle: { color: 'rgba(0,0,0,0.6)' } }
+                    },
+                    series: [{
+                        type: 'bar3D', data: data, shading: 'lambert', label: { show: false },
+                        itemStyle: { opacity: 0.9 },
+                        emphasis: { itemStyle: { color: '#FFDB58' }, label: { show: false } }
+                    }]
+                };
+                chart.setOption(option);
+                console.log("3D Histogram options set.");
+            } catch (error) {
+                showError("Failed to generate 3D Histogram.", error);
+            }
+        }
+
+
+        // --- AI Insights ---
+        function generateAIInsights(data) {
+             console.log("Generating AI Insights...");
+            const insightsDiv = document.getElementById('aiInsights');
+            if (!data || data.length === 0) {
+                insightsDiv.innerHTML = '<p class="text-gray-400">No valid data to analyze.</p>';
+                return;
+            }
+            try {
+                const values = data.map(d => d.value);
+                const total = values.reduce((sum, v) => sum + v, 0);
+                const avg = total / data.length;
+                const max = Math.max(...values);
+                const min = Math.min(...values);
+                const maxEntry = data.find(d => d.value === max);
+                const minEntry = data.find(d => d.value === min);
+                const maxLabel = maxEntry ? maxEntry.label : 'N/A';
+                const minLabel = minEntry ? minEntry.label : 'N/A';
+                // Calculate Standard Deviation
+                const stdDev = Math.sqrt(values.map(x => Math.pow(x - avg, 2)).reduce((a, b) => a + b, 0) / data.length);
+                // Calculate Median
+                const sortedValues = [...values].sort((a, b) => a - b);
+                const mid = Math.floor(sortedValues.length / 2);
+                const median = sortedValues.length % 2 !== 0 ? sortedValues[mid] : (sortedValues[mid - 1] + sortedValues[mid]) / 2;
+
+                insightsDiv.innerHTML = `
+                    <p><strong>Data Points:</strong> ${data.length}</p>
+                    <p><strong>Total Value:</strong> ${total.toLocaleString()}</p>
+                    <p><strong>Average Value:</strong> ${avg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p><strong>Median Value:</strong> ${median.toLocaleString()}</p>
+                    <p><strong>Standard Deviation:</strong> ${stdDev.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p><strong>Maximum Value:</strong> ${maxLabel} (${max.toLocaleString()})</p>
+                    <p><strong>Minimum Value:</strong> ${minLabel} (${min.toLocaleString()})</p>
+                    <p><strong>Range:</strong> ${(max - min).toLocaleString()}</p>
+                `;
+                 console.log("AI Insights updated.");
+            } catch (error) {
+                 showError("Failed to generate AI Insights.", error);
+                 insightsDiv.innerHTML = '<p class="text-red-400">Error generating insights.</p>';
+            }
+        }
+
+        // --- Resizing ---
+        let resizeTimeout;
+        function resizeCharts() {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                console.log("Debounced resize event triggered. Resizing charts...");
+                // Resize ECharts instances
+                Object.keys(echartInstances).forEach(id => {
+                    const instance = echartInstances[id];
+                    // Check if instance exists and is not disposed
+                    if (instance && typeof instance.resize === 'function' && !instance.isDisposed()) {
+                        try {
+                            instance.resize();
+                            console.log(`Resized ECharts instance: ${id}`);
+                        } catch (e) {
+                            // Check if error is due to disposed instance (shouldn't happen with check, but good practice)
+                            if (e.message.includes('Instance')) {
+                                console.warn(`Attempted to resize disposed ECharts instance: ${id}`);
+                                echartInstances[id] = null; // Clean up reference
+                            } else {
+                                console.warn(`ECharts resize error for ${id}:`, e);
+                            }
+                        }
+                    } else if (instance && instance.isDisposed()) {
+                         console.log(`Skipping resize for disposed ECharts instance: ${id}`);
+                         echartInstances[id] = null; // Clean up reference if somehow missed
+                    } else {
+                         console.log(`Skipping resize for ${id}, instance not available.`);
+                    }
+                });
+                // Resize Plotly charts
+                plotlyContainers.forEach(id => {
+                    const container = document.getElementById(id);
+                    // Check if container exists and has a plotly graph rendered inside
+                    if (container && container.classList.contains('js-plotly-plot')) {
+                         try {
+                             Plotly.Plots.resize(container);
+                             console.log(`Resized Plotly plot: ${id}`);
+                         } catch(e) { console.warn(`Plotly resize error for ${id}:`, e); }
+                    } else if (container && container.querySelector('.plotly')) {
+                         // Fallback check for plotly element inside
+                         try {
+                             Plotly.Plots.resize(container);
+                             console.log(`Resized Plotly plot (fallback check): ${id}`);
+                         } catch(e) { console.warn(`Plotly resize error for ${id} (fallback check):`, e); }
+                    }
+                });
+            }, 250); // Debounce resize events (250ms delay)
+        }
+
+        // --- Initial Setup ---
+        window.onload = () => {
+             console.log("DOM fully loaded. Checking libraries...");
+             // Check for libraries immediately on load
+             let librariesLoaded = true;
+             if (typeof echarts === 'undefined') {
+                 console.error("ECharts library not loaded on window.onload");
+                 showError("ECharts library failed to load. Charts may not work.");
+                 librariesLoaded = false;
+             } else {
+                 console.log("ECharts loaded.");
+             }
+             // Check for ECharts GL component specifically
+             if (typeof echarts.graphic === 'undefined' || typeof echarts.ComponentModel.getComponentClasses === 'undefined') {
+                 // This check might be too simplistic depending on ECharts internal structure changes
+                 // A better check might be trying to init a simple GL chart in a try-catch, but that's heavier.
+                 // For now, we rely on the ECharts-GL script loading.
+                 // console.warn("ECharts-GL components might not be fully registered yet.");
+             }
+             if (typeof Plotly === 'undefined') {
+                 console.error("Plotly library not loaded on window.onload");
+                 showError("Plotly library failed to load. Charts may not work.");
+                 librariesLoaded = false;
+             } else {
+                 console.log("Plotly loaded.");
+             }
+
+             // Set initial placeholder text
+             document.getElementById('aiInsights').innerHTML = '<p class="text-gray-400">Enter data via text area or upload a CSV file, then click "Generate Visuals".</p>';
+             echartContainers.forEach(id => {
+                 const el = document.getElementById(id);
+                 if(el) el.innerHTML = `<div class="placeholder-text">${id.replace('3d',' 3D ')} Area</div>`;
+             });
+             plotlyContainers.forEach(id => {
+                 const el = document.getElementById(id);
+                 if(el) el.innerHTML = `<div class="placeholder-text">${id.replace('3d',' 3D ')} Area</div>`;
+             });
+
+             // Set default text area content for demonstration if empty
+             const textArea = document.getElementById('textInput');
+             if (textArea && !textArea.value) {
+                  textArea.value = "Category,Value,Extra\nAlpha,25,10\nBeta,40,15\nGamma,15,20\nDelta,55,25\nEpsilon,30,30\nZeta,20,35\nEta,10,40\nTheta,45,45\nIota,60,50\nKappa,33,55\nLambda,28,60\nMu,50,65";
+                  console.log("Set default text area content.");
+                  // Optionally generate visuals on load with default data
+                  if(librariesLoaded) {
+                      console.log("Attempting to generate visuals on load with default data...");
+                      generateVisuals();
+                  } else {
+                      console.warn("Skipping initial generation due to library loading issues.");
+                  }
+             } else if (librariesLoaded && textArea && textArea.value) {
+                 // If libraries loaded and text area has content (e.g., from refresh), generate visuals
+                 console.log("Generating visuals on load with existing text area content...");
+                 generateVisuals();
+             }
+        };
+
+        // Add a global error handler for uncaught exceptions during runtime
+        window.onerror = function(message, source, lineno, colno, error) {
+           console.error("Uncaught global error:", message, "at", source, lineno, ":", colno, error);
+           showError(`An unexpected script error occurred: ${message}. Check the console (F12) for details.`, error);
+           return true; // Prevents the browser's default error handling
+        };
+
+        // Handle unhandled promise rejections (e.g., issues during async operations)
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Unhandled promise rejection:', event.reason);
+            showError(`An async operation failed: ${event.reason?.message || event.reason}. Check console.`, event.reason);
+        });
+
+
+        console.log("Script execution finished. Event listeners are set up.");
+
+    </script>
+</body>
+</html>
+
+                                                                                 Powered by Pheonix
